@@ -43,14 +43,17 @@ class FishBot:
         """
         Reel in the fish step by step.
         """
+        # sleep and wait the scene load
+        random_sleep_millisecond(300, 500)
         while True:
             if self.vision.on_critical_point():
                 self.simulator.fish_reel_in_step()
-            elif self.vision.fish_should_harvest():
-                print("fish should harvest")
-                # wait for the harvest scene to load
-                random_sleep_millisecond(1000, 3000)
-                self.simulator.fish_end_harvest_scene()
+            elif not self.vision.in_reel_scene():
+                print("not in reel scene, now should be ready to re-cast")
+                # wait harvest scene to load
+                time.sleep(5)
+                # if level up, here should be another click to quit the level up scene
+                self.simulator.fish_empty()
                 random_sleep_millisecond(1000, 3000)
                 break
             else:

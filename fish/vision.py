@@ -24,6 +24,13 @@ class VisionProcessor:
                 f"Failed to load template image. Expected at: {harvest_template_path}\n"
                 f"Tip: create `fish/templates/` and place `harvest.png` there."
             )
+        reel_scene_template_path = Path(__file__).resolve().parent / "templates" / "reel.png"
+        self.__fish_reel_scene_template = cv2.imread(str(reel_scene_template_path), cv2.IMREAD_COLOR)
+        if self.__fish_reel_scene_template is None:
+            raise FileNotFoundError(
+                f"Failed to load template image. Expected at: {reel_scene_template_path}\n"
+                f"Tip: create `fish/templates/` and place `reel_scene.png` there."
+            )
         
         self.__capture = WindowCapture()
 
@@ -131,6 +138,16 @@ class VisionProcessor:
                 should_click = True
 
         return should_click
+    
+    def in_reel_scene(self):
+        """
+        Detect if the fish is in the reel scene.
+        """
+        image = self.capture_screen()
+        # 538 128 1065 235
+        image = image[740:790, 580:1130]
+        max_val, _ = self.match_by_edge(image, self.__fish_reel_scene_template)
+        return max_val > 0.3
 
     def fish_should_harvest(self):
         """
@@ -139,18 +156,36 @@ class VisionProcessor:
         image = self.capture_screen()
         # 538 128 1065 235
         image = image[120:240, 530:1070]
-        result = cv2.matchTemplate(image, self.__fish_should_harvest_template, cv2.TM_CCOEFF_NORMED)
-        # matchTemplate returns a heatmap; use the max score as the match confidence.
-        max_val = float(result.max())
-        if max_val > 0.7:
-            return True
-        else:
-            return False
+        max_val, _ = self.match_by_edge(image, self.__fish_should_harvest_template)
+        return max_val > 0.2
+
+    def match_by_edge(self, screen_img, template_img):
+        # 1. 转灰度
+        screen_gray = cv2.cvtColor(screen_img, cv2.COLOR_BGR2GRAY)
+        tpl_gray = cv2.cvtColor(template_img, cv2.COLOR_BGR2GRAY)
+
+        # 2. Canny 边缘检测 (提取线条)
+        # 这里的阈值 100, 200 可能需要微调，看你的图标线条清晰度
+        screen_edge = cv2.Canny(screen_gray, 100, 200)
+        tpl_edge = cv2.Canny(tpl_gray, 100, 200)
+
+        # 3. 匹配线条图
+        # 注意：匹配边缘时，TM_CCOEFF_NORMED 通常效果最好
+        res = cv2.matchTemplate(screen_edge, tpl_edge, cv2.TM_CCOEFF_NORMED)
+        
+        # 获取最大匹配值
+        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+        
+        # 调试显示边缘图 (看看是不是提取出了干净的轮廓)
+        # cv2.imshow("Screen Edge", screen_edge)
+        # cv2.imshow("Template Edge", tpl_edge)
+        
+        return max_val, max_loc
 
 if __name__ == "__main__":
     vision = VisionProcessor()
     while True:
         now_time = time.time()
-        should_click = vision.fish_should_harvest()
-        print(f"time: {time.time() - now_time}, should_click: {should_click}")
+        in_reel_scene = vision.in_reel_scene()
+        print(f"time: {time.time() - now_time}, in_reel_scene: {in_reel_scene}")
 

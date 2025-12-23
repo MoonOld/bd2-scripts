@@ -14,12 +14,18 @@ class SimulatorController:
         self.__adb = AdbClient()
         self.__fish_button_x = 1420
         self.__fish_button_y = 720
+
+        self.__fish_empty_button_x = 1400
+        self.__fish_empty_button_y = 370
     
     def fish_cast(self):
         random_swipe_time = randint(500, 1000)
         self.__adb.hold(self.__fish_button_x, self.__fish_button_y, random_swipe_time)
     
     def fish_reel(self):
+        self.__adb.tap(self.__fish_button_x, self.__fish_button_y)
+    
+    def fish_empty(self):
         self.__adb.tap(self.__fish_button_x, self.__fish_button_y)
     
     def fish_reel_in_step(self):
