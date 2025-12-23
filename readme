@@ -1,0 +1,150 @@
+## bd2-scripts
+
+一组用于 **MuMu 模拟器（或其他安卓模拟器）** 的自动化脚本：通过 **ADB 点击/长按** + **OpenCV 视觉识别** 完成游戏内“钓鱼”流程（持续抛竿、上钩检测、收线判定、收获结算）。
+
+当前主要代码在 `bd2-scripts/fish/`。
+
+---
+
+## 目录结构
+
+- `fish/fish_main.py`: 主入口（状态机/流程控制）
+- `fish/simulator.py`: 模拟器交互封装（点击/长按），内部用 `AdbClient`
+- `fish/adb.py`: ADB 连接、tap/hold、（可选）ADB 截图
+- `fish/vision.py`: 视觉识别（模板匹配 + HSV 颜色检测），内部用 `WindowCapture`
+- `fish/win_capture.py`: Windows 下通过 `mss` 截取指定窗口客户区（返回 OpenCV 可用的 BGR 图）
+- `fish/get_hsv.py`: HSV 取色小工具（点图上像素，打印 HSV 和建议阈值）
+- `fish/templates/`: 模板图片（`hooked.png`、`harvest.png`、`reel_in_step.png`）
+
+---
+
+## 环境依赖
+
+建议使用 Conda 或 venv（Windows 10/11）。
+
+Python 包：
+
+- `opencv-python`
+- `numpy`
+- `mss`
+- `pywin32`（`win32gui` 用于根据窗口标题定位窗口）
+
+ADB：
+
+- 安装 Android platform-tools，并确保 `adb.exe` 路径可用
+
+---
+
+## 配置项（必看）
+
+### 1) ADB 路径与端口
+
+编辑 `fish/adb.py`：
+
+- `self.adb_path`: 指向你本机 `adb.exe` 的绝对路径
+- `self.device_address`: 模拟器暴露的 ADB 地址（示例默认 `127.0.0.1:16384`，按你实际端口修改）
+
+### 2) 模拟器窗口标题
+
+编辑 `fish/win_capture.py`：
+
+- `WindowCapture(window_title="MuMu安卓设备")`
+
+如果找不到窗口（`FindWindow` 返回空），请把标题改成你任务栏悬浮显示的那个窗口名（例如 “MuMu模拟器12”）。
+
+### 3) 模板图片
+
+确保这些文件存在（代码用的是**相对 `vision.py` 文件**定位）：
+
+- `fish/templates/hooked.png`
+- `fish/templates/harvest.png`
+- `fish/templates/reel_in_step.png`（给 `get_hsv.py` 用）
+
+### 4) 坐标/ROI（你大概率需要调）
+
+视觉与点击坐标都是“像素坐标”，且基于你当前窗口大小/缩放/分辨率。
+
+- `fish/vision.py`
+  - `fish_hooked()` / `fish_should_harvest()` 里的裁剪区域（ROI）
+  - `roi_x/roi_y/roi_w/roi_h`（收线滑条区域）
+  - HSV 阈值（`cursor_lower/upper`, `zone_lower/upper`）
+
+注意：Numpy/OpenCV 的裁剪顺序是：
+
+- `img[y1:y2, x1:x2]`（先 **高/行 y**，再 **宽/列 x**）
+
+- `fish/simulator.py`
+  - `__fish_button_x/__fish_button_y`（按钮点击点）
+
+---
+
+## 运行方式
+
+在 `bd2-scripts/` 目录下执行（推荐）：
+
+```bash
+python -m fish.fish_main
+```
+
+或直接跑脚本（也可以）：
+
+```bash
+python fish/fish_main.py
+```
+
+常用调试：
+
+```bash
+# 只跑视觉识别（打印/窗口调试）
+python fish/vision.py
+
+# 测试窗口截图速度与区域是否正确
+python fish/win_capture.py
+
+# HSV 取色（在 reel_in_step.png 上点击取色）
+python fish/get_hsv.py
+```
+
+---
+
+## 常见问题（Troubleshooting）
+
+### 1) `cv2.imread(...)` 返回 `None`
+
+说明模板图片路径不对或文件不存在。检查：
+
+- `fish/templates/` 下是否有对应 png
+- 文件名是否一致（代码当前读取 `hooked.png` / `harvest.png`）
+
+### 2) `cv2.matchTemplate` 报错：`Assertion failed ... _img.size() ... <= _templ.size() ...`
+
+原因：你传入的 **ROI 比模板还小**（搜索图必须 >= 模板图）。
+
+解决：
+
+- 调大 `vision.py` 里对应的裁剪区域（ROI）
+- 或重做一个更小的模板（从同一分辨率/缩放下截取）
+
+### 3) 找不到窗口 / 截到全黑 / 坐标明显偏移
+
+多半是以下原因：
+
+- 窗口标题不对（改 `win_capture.py` 的 `window_title`）
+- 模拟器缩放/分辨率变了，导致 ROI/点击坐标失效（重新标定 `vision.py` / `simulator.py`）
+- `win_capture.py` 里有 MuMu “额外微调”（`top += 50`, `height = 900`）需要按你的环境调整
+
+### 4) ADB 点不到 / 连接失败
+
+检查：
+
+- `adb.exe` 路径是否正确（`fish/adb.py`）
+- `device_address` 端口是否正确（MuMu/模拟器设置里查看）
+- 先手动运行一次：`adb connect 127.0.0.1:xxxx`
+
+---
+
+## TODO / 下一步
+
+- 把 ROI/HSV 阈值做成可配置（json/yaml），避免硬编码
+- 增加“截图+标定”工具：实时显示鼠标所在坐标与像素值，方便快速调参
+
