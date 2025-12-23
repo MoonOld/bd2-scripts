@@ -1,0 +1,65 @@
+import time
+from random import randint
+try:
+    from .simulator import SimulatorController
+    from .vision import VisionProcessor
+    from .base import random_sleep_millisecond
+except ImportError:
+    from simulator import SimulatorController
+    from vision import VisionProcessor
+    from base import random_sleep_millisecond
+
+class FishBot:
+    """
+    Core state machine to manage game logic and coordinate simulator and vision components.
+    """
+    def __init__(self):
+        self.simulator = SimulatorController()
+        self.vision = VisionProcessor()
+        
+
+
+    def fish(self):
+        """
+        Transition state based on the current situation.
+        """
+        # start fish
+        while True:
+            random_sleep_millisecond(1000, 3000)
+            print("fish cast")
+            self.simulator.fish_cast()
+            while True:
+                if self.vision.fish_hooked():
+                    print("fish hooked")
+                    self.simulator.fish_reel()
+                    print("fish reel")
+                    self.fish_reel_in_step()
+                    break
+                else:
+                    random_sleep_millisecond(200, 500)
+            
+    
+    def fish_reel_in_step(self):
+        """
+        Reel in the fish step by step.
+        """
+        while True:
+            if self.vision.on_critical_point():
+                self.simulator.fish_reel_in_step()
+            elif self.vision.fish_should_harvest():
+                print("fish should harvest")
+                # wait for the harvest scene to load
+                random_sleep_millisecond(1000, 3000)
+                self.simulator.fish_end_harvest_scene()
+                random_sleep_millisecond(1000, 3000)
+                break
+            else:
+                random_sleep_millisecond(20, 50)
+
+
+
+
+if __name__ == "__main__":
+    bot = FishBot()
+    bot.fish()
+
