@@ -130,20 +130,6 @@ class VisionProcessor:
             if distance < self.hit_threshold:
                 should_click = True
 
-        # ==================
-        # 5. 可视化调试 (画框框给你看)
-        # ==================
-        debug_img = roi.copy()
-        if cursor_cnt is not None:
-            cv2.drawContours(debug_img, [cursor_cnt], -1, (0, 0, 255), 2) # 红色描边光标
-        if zone_cnt is not None:
-            cv2.drawContours(debug_img, [zone_cnt], -1, (0, 255, 0), 2)   # 绿色描边区域
-        
-        if should_click:
-            cv2.putText(debug_img, "HIT!", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
-
-        cv2.imshow("Reel Debug", debug_img)
-        cv2.waitKey(1)
         return should_click
 
     def fish_should_harvest(self):
