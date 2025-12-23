@@ -56,8 +56,6 @@ class FishBot:
                 self.simulator.fish_empty()
                 random_sleep_millisecond(1000, 3000)
                 break
-            else:
-                random_sleep_millisecond(20, 50)
 
 
 
