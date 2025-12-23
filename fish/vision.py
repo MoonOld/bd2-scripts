@@ -59,7 +59,7 @@ class VisionProcessor:
         self.zone_upper = np.array([35, 255, 255])
         
         # 点击偏差容忍度 (像素)
-        self.hit_threshold = 50
+        self.hit_threshold = 80
 
     def capture_screen(self):
         """
