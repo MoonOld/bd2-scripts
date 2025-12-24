@@ -99,14 +99,11 @@ class VisionProcessor:
         """
         # 790 239 804 306
         image = self.capture_screen()
-        image = image[230:320, 780:810]
-        result = cv2.matchTemplate(image, self.__fish_hooked_template, cv2.TM_CCOEFF_NORMED)
+        image = image[230:320, 787:810]
+        max_val, _ = self.match_by_edge(image, self.__fish_hooked_template)
+
         # matchTemplate returns a heatmap; use the max score as the match confidence.
-        max_val = float(result.max())
-        if max_val > 0.7:
-            return True
-        else:
-            return False
+        return max_val > 0.4
 
     def on_critical_point(self):
         """
@@ -164,21 +161,28 @@ class VisionProcessor:
         screen_gray = cv2.cvtColor(screen_img, cv2.COLOR_BGR2GRAY)
         tpl_gray = cv2.cvtColor(template_img, cv2.COLOR_BGR2GRAY)
 
-        # 2. Canny 边缘检测 (提取线条)
-        # 这里的阈值 100, 200 可能需要微调，看你的图标线条清晰度
-        screen_edge = cv2.Canny(screen_gray, 100, 200)
-        tpl_edge = cv2.Canny(tpl_gray, 100, 200)
+        # 2. 高斯模糊 (去噪点，让边缘更圆润，必做！)
+        # (5, 5) 是模糊核大小
+        screen_blur = cv2.GaussianBlur(screen_gray, (5, 5), 0)
+        tpl_blur = cv2.GaussianBlur(tpl_gray, (5, 5), 0)
 
-        # 3. 匹配线条图
-        # 注意：匹配边缘时，TM_CCOEFF_NORMED 通常效果最好
-        res = cv2.matchTemplate(screen_edge, tpl_edge, cv2.TM_CCOEFF_NORMED)
-        
-        # 获取最大匹配值
+        # 3. Canny 边缘检测
+        screen_edge = cv2.Canny(screen_blur, 100, 200)
+        tpl_edge = cv2.Canny(tpl_blur, 100, 200)
+
+        # 4. 【关键步骤】膨胀 (Dilation) - 让线条变粗
+        # kernel 是膨胀的力度，(3,3) 意味着向四周扩散 1 像素
+        kernel = np.ones((3, 3), np.uint8)
+        screen_fat = cv2.dilate(screen_edge, kernel, iterations=2)
+        tpl_fat = cv2.dilate(tpl_edge, kernel, iterations=2)
+
+        # 5. 匹配
+        res = cv2.matchTemplate(screen_fat, tpl_fat, cv2.TM_CCOEFF_NORMED)
         min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
         
-        # 调试显示边缘图 (看看是不是提取出了干净的轮廓)
-        # cv2.imshow("Screen Edge", screen_edge)
-        # cv2.imshow("Template Edge", tpl_edge)
+        # 【调试】一定要看这两张图！
+        # 如果图里是一片黑或者全是噪点，那肯定匹配不上
+
         
         return max_val, max_loc
 
@@ -186,6 +190,6 @@ if __name__ == "__main__":
     vision = VisionProcessor()
     while True:
         now_time = time.time()
-        in_reel_scene = vision.in_reel_scene()
-        print(f"time: {time.time() - now_time}, in_reel_scene: {in_reel_scene}")
+        in_reel_scene = vision.fish_hooked()
+        time.sleep(0.5)
 
